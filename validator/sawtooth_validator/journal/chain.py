@@ -124,7 +124,7 @@ class BlockValidator(object):
                 return False
         return True
 
-    def _validate_block(self, blkw):
+    def validate_block(self, blkw):
         try:
             if blkw.status == BlockStatus.Valid:
                 return True
@@ -276,7 +276,7 @@ class BlockValidator(object):
             valid = True
             for block in reversed(new_chain):
                 if valid:
-                    if not self._validate_block(block):
+                    if not self.validate_block(block):
                         LOGGER.info("Block validation failed: %s", block)
                         valid = False
                 else:
@@ -327,7 +327,8 @@ class ChainController(object):
                  executor,
                  transaction_executor,
                  on_chain_updated,
-                 squash_handler):
+                 squash_handler,
+                 chain_id_manager):
         """Initialize the ChainController
         Args:
             consensus_module: the python module containing the consensus
@@ -363,6 +364,7 @@ class ChainController(object):
         self._blocks_pending = {}  # set of blocks that the previous block
         # is being processed. Once that completes this block will be
         # scheduled for validation.
+        self._chain_id_manager = chain_id_manager
 
         try:
             self._chain_head = self._block_store.chain_head
@@ -452,6 +454,10 @@ class ChainController(object):
                     # do we already have this block
                     return
 
+                if self.chain_head is None:
+                    self._set_genesis(block)
+                    return
+
                 self._block_cache[block.identifier] = block
                 self._blocks_pending[block.identifier] = []
                 LOGGER.debug("Block received: %s", block)
@@ -473,3 +479,38 @@ class ChainController(object):
         # pylint: disable=broad-except
         except Exception as exc:
             LOGGER.exception(exc)
+
+    def _set_genesis(self, block):
+        # This is used by a non-genesis journal when it has recieved the
+        # genesis block from the genesis validator
+        if block.previous_block_id == NULL_BLOCK_IDENTIFIER:
+            chain_id = self._chain_id_manager.get_block_chain_id()
+            if chain_id != block.identifier:
+                LOGGER.warning("Block id does not match block chain id."
+                               "Cannot set intitial chain head.")
+            elif chain_id is None:
+                self._chain_id_manager.save_block_chain_id(block.identifier)
+
+            validator = BlockValidator(
+                consensus_module=self._consensus_module,
+                new_block=block,
+                chain_head=self._chain_head,
+                block_cache=self._block_cache,
+                state_view_factory=self._state_view_factory,
+                done_cb=self.on_block_validated,
+                executor=self._transaction_executor,
+                squash_handler=self._sqaush_handler)
+
+            valid = validator.validate_block(block)
+            if valid:
+                self._block_store.set_chain_head(block.identifier)
+                self._block_store[block.identifier] = block
+                self._chain_head = block
+                self._notify_on_chain_updated(self._chain_head)
+            else:
+                LOGGER.warning("The genesis block is not valid. Cannot "
+                               "set chain head: %s", block)
+
+        else:
+            LOGGER.warning("Cannot set initial chain head, this is not a "
+                           "genesis block: %s", block)

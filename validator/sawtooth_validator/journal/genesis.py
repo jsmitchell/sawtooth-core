@@ -38,7 +38,8 @@ class GenesisController(object):
                  completer,
                  block_store,
                  identity_key,
-                 data_dir):
+                 data_dir,
+                 chain_id_manager):
         """Creates a GenesisController.
 
         Args:
@@ -57,6 +58,7 @@ class GenesisController(object):
         self._block_store = block_store
         self._identity_priv_key = identity_key
         self._data_dir = data_dir
+        self._chain_id_manager = chain_id_manager
 
     def requires_genesis(self):
         """
@@ -82,7 +84,7 @@ class GenesisController(object):
             'chain_head: %s',
             self._block_store['chain_head_id'] if has_chain_head else 'None')
 
-        block_chain_id = self._get_block_chain_id()
+        block_chain_id = self._chain_id_manager.get_block_chain_id()
         is_genesis_node = block_chain_id is None
         LOGGER.debug('block_chain_id: %s', block_chain_id)
 
@@ -171,36 +173,13 @@ class GenesisController(object):
             "weight": blkw.weight
         }
 
-        self._save_block_chain_id(block.header_signature)
+        self._chain_id_manager.save_block_chain_id(block.header_signature)
 
         LOGGER.debug('Deleting genesis data.')
         os.remove(genesis_file)
 
         if on_done is not None:
             on_done()
-
-    def _get_block_chain_id(self):
-        block_chain_id_file = os.path.join(self._data_dir, 'block-chain-id')
-        if not Path(block_chain_id_file).is_file():
-            return None
-
-        try:
-            with open(block_chain_id_file, 'r') as f:
-                block_chain_id = f.read()
-                return block_chain_id if block_chain_id else None
-        except IOError:
-            raise InvalidGenesisStateError(
-                'The block-chain-id file exists, but is unreadable')
-
-    def _save_block_chain_id(self, block_chain_id):
-        LOGGER.debug('writing block chain id')
-        block_chain_id_file = os.path.join(self._data_dir, 'block-chain-id')
-        try:
-            with open(block_chain_id_file, 'w') as f:
-                f.write(block_chain_id)
-        except IOError:
-            raise InvalidGenesisStateError(
-                'The block-chain-id file exists, but is unwriteable')
 
     @staticmethod
     def _generate_genesis_block():

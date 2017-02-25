@@ -103,7 +103,8 @@ class Journal(object):
                  block_sender,
                  transaction_executor,
                  squash_handler,
-                 block_cache=None  # not require, allows tests to inject a
+                 chain_id_manager,
+                 block_cache=None,  # not required, allows tests to inject a
                  # prepopulated block cache.
                  ):
         self._consensus_module = consensus_module
@@ -124,6 +125,7 @@ class Journal(object):
         self._chain_controller = None
         self._block_queue = queue.Queue()
         self._chain_thread = None
+        self._chain_id_manager = chain_id_manager
 
     def _init_subprocesses(self):
         self._block_publisher = BlockPublisher(
@@ -145,7 +147,8 @@ class Journal(object):
             executor=ThreadPoolExecutor(1),
             transaction_executor=self._transaction_executor,
             on_chain_updated=self._block_publisher.on_chain_updated,
-            squash_handler=self._squash_handler
+            squash_handler=self._squash_handler,
+            chain_id_manager=self._chain_id_manager
         )
         self._chain_thread = self._ChainThread(self._chain_controller,
                                                self._block_queue,

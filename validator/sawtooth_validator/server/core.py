@@ -50,6 +50,7 @@ from sawtooth_validator.gossip.gossip_handlers import PeerRegisterHandler
 from sawtooth_validator.gossip.gossip_handlers import PeerUnregisterHandler
 from sawtooth_validator.gossip.gossip_handlers import PingHandler
 from sawtooth_validator.state.state_view import StateViewFactory
+from sawtooth_validator.journal.chain_id_manager import ChainIdManager
 
 LOGGER = logging.getLogger(__name__)
 
@@ -130,7 +131,7 @@ class Validator(object):
         completer = Completer(block_store, self._gossip)
 
         block_sender = BroadcastBlockSender(completer, self._gossip)
-
+        chain_id_manager = ChainIdManager(data_dir)
         # Create and configure journal
         self._journal = Journal(
             consensus_module=dev_mode_consensus,
@@ -138,7 +139,9 @@ class Validator(object):
             state_view_factory=StateViewFactory(merkle_db),
             block_sender=block_sender,
             transaction_executor=executor,
-            squash_handler=context_manager.get_squash_handler())
+            squash_handler=context_manager.get_squash_handler(),
+            chain_id_manager=chain_id_manager
+        )
 
         self._genesis_controller = GenesisController(
             context_manager=context_manager,
@@ -146,7 +149,8 @@ class Validator(object):
             completer=completer,
             block_store=block_store,
             identity_key=identity_signing_key,
-            data_dir=data_dir
+            data_dir=data_dir,
+            chain_id_manager=chain_id_manager
         )
 
         responder = Responder(completer)
