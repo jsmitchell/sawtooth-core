@@ -34,8 +34,8 @@ def load_conf()
     config = {
         'VAGRANT_BOX' => 'ubuntu/xenial64',
         'VAGRANT_FORWARD_PORTS' => true,
-        'VAGRANT_MEMORY' => 2048,
-        'VAGRANT_CPUS' => 2
+        'VAGRANT_MEMORY' => 4096,
+        'VAGRANT_CPUS' => 4
     }
 
     if RbConfig::CONFIG['host_os'] !~ /mswin|mingw/
