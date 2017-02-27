@@ -20,11 +20,11 @@ import unittest
 from unittest.mock import Mock
 from unittest.mock import patch
 
-from sawtooth_signing import pbct as signing
-from sawtooth_validator.journal.chain_id_manager import ChainIdManager
+from sawtooth_signing import secp256k1_signer as signing
 from sawtooth_validator.protobuf.genesis_pb2 import GenesisData
 from sawtooth_validator.journal.genesis import GenesisController
 from sawtooth_validator.journal.genesis import InvalidGenesisStateError
+from sawtooth_validator.journal.chain_id_manager import ChainIdManager
 
 
 class TestGenesisController(unittest.TestCase):

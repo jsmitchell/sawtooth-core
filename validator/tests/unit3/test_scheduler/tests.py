@@ -15,8 +15,8 @@
 
 import hashlib
 import unittest
-import bitcoin
 
+from sawtooth_signing import secp256k1_signer as signing
 import sawtooth_validator.protobuf.batch_pb2 as batch_pb2
 import sawtooth_validator.protobuf.transaction_pb2 as transaction_pb2
 
@@ -45,9 +45,7 @@ def create_transaction(name, private_key, public_key):
 
     header_bytes = header.SerializeToString()
 
-    signature = bitcoin.ecdsa_sign(
-        header_bytes,
-        private_key)
+    signature = signing.sign(header_bytes, private_key)
 
     transaction = transaction_pb2.Transaction(
         header=header_bytes,
@@ -66,9 +64,7 @@ def create_batch(transactions, private_key, public_key):
 
     header_bytes = header.SerializeToString()
 
-    signature = bitcoin.ecdsa_sign(
-        header_bytes,
-        private_key)
+    signature = signing.sign(header_bytes, private_key)
 
     batch = batch_pb2.Batch(
         header=header_bytes,
@@ -91,9 +87,9 @@ class TestSerialScheduler(unittest.TestCase):
         This test also finalizes the scheduler and verifies that StopIteration
         is thrown by the iterator.
         """
-        private_key = bitcoin.random_key()
-        public_key = bitcoin.encode_pubkey(
-            bitcoin.privkey_to_pubkey(private_key), "hex")
+        private_key = signing.generate_privkey()
+        public_key = signing.generate_pubkey(private_key)
+
         context_manager = ContextManager(dict_database.DictDatabase())
         squash_handler = context_manager.get_squash_handler()
         first_state_root = context_manager.get_first_root()
@@ -152,9 +148,8 @@ class TestSerialScheduler(unittest.TestCase):
         since the first Transaction was marked as applied in the previous
         step.
         """
-        private_key = bitcoin.random_key()
-        public_key = bitcoin.encode_pubkey(
-            bitcoin.privkey_to_pubkey(private_key), "hex")
+        private_key = signing.generate_privkey()
+        public_key = signing.generate_pubkey(private_key)
 
         context_manager = ContextManager(dict_database.DictDatabase())
         squash_handler = context_manager.get_squash_handler()
@@ -206,9 +201,8 @@ class TestSerialScheduler(unittest.TestCase):
                through the squash function.
             4. Verify that correct batch statuses are set
         """
-        private_key = bitcoin.random_key()
-        public_key = bitcoin.encode_pubkey(
-            bitcoin.privkey_to_pubkey(private_key), "hex")
+        private_key = signing.generate_privkey()
+        public_key = signing.generate_pubkey(private_key)
 
         context_manager = ContextManager(dict_database.DictDatabase())
         squash_handler = context_manager.get_squash_handler()
