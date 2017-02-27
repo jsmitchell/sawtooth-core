@@ -13,6 +13,7 @@
 # limitations under the License.
 # ------------------------------------------------------------------------------
 
+import sys
 import asyncio
 import hashlib
 import logging
@@ -42,7 +43,7 @@ def get_enum_name(enum_value):
 
 
 class _SendReceive(object):
-    def __init__(self, address, futures, identity=None,
+    def __init__(self, whoami, address, futures, identity=None,
                  dispatcher=None, secured=False,
                  server_public_key=None, server_private_key=None):
         """
@@ -57,6 +58,7 @@ class _SendReceive(object):
                 server_public_key used by the server socket to sign
                 messages are part of the zmq auth handshake.
         """
+        self._whoami = whoami
         self._dispatcher = dispatcher
         self._futures = futures
         self._address = address
@@ -86,8 +88,11 @@ class _SendReceive(object):
             message = validator_pb2.Message()
             message.ParseFromString(msg_bytes)
 
-            LOGGER.debug("receiving %s message",
-                         get_enum_name(message.message_type))
+            if get_enum_name(message.message_type)[:2] != 'TP':
+                LOGGER.debug("%s receiving %s message: %s bytes",
+                             self._whoami,
+                             get_enum_name(message.message_type),
+                             sys.getsizeof(msg_bytes))
             try:
                 self._futures.set_result(
                     message.correlation_id,
@@ -101,17 +106,20 @@ class _SendReceive(object):
                         "received a first message on the zmq dealer.")
             else:
                 my_future = self._futures.get(message.correlation_id)
-                LOGGER.debug("message round "
-                             "trip: %s %s",
-                             get_enum_name(message.message_type),
-                             my_future.get_duration())
+                if get_enum_name(message.message_type)[:2] != 'TP':
+                    LOGGER.debug("message round "
+                                 "trip: %s %s",
+                                 get_enum_name(message.message_type),
+                                 my_future.get_duration())
                 self._futures.remove(message.correlation_id)
 
     @asyncio.coroutine
     def _send_message(self, identity, msg):
-        LOGGER.debug("sending %s to %s",
-                     get_enum_name(msg.message_type),
-                     identity)
+        if get_enum_name(msg.message_type)[:2] != 'TP':
+            LOGGER.debug("%s sending %s to %s",
+                         self._whoami,
+                         get_enum_name(msg.message_type),
+                         identity if identity else self._address)
 
         if identity is None:
             message_bundle = [msg.SerializeToString()]
@@ -212,6 +220,7 @@ class Interconnect(object):
         """
         self._futures = future.FutureCollection()
         self._send_receive_thread = _SendReceive(
+            "ServerThread",
             address=endpoint,
             dispatcher=dispatcher,
             futures=self._futures,
@@ -278,6 +287,7 @@ class Connection(object):
         self._server_public_key = server_public_key
         self._server_private_key = server_private_key
         self._send_receive_thread = _SendReceive(
+            "ConnectionThread-{}".format(self._endpoint),
             endpoint,
             futures=self._futures,
             identity=identity,
