@@ -82,7 +82,6 @@ class GossipMessageHandler(Handler):
 
 
 class GossipBroadcastHandler(Handler):
-
     def __init__(self, gossip):
         self._gossip = gossip
 
@@ -106,7 +105,6 @@ class GossipBroadcastHandler(Handler):
 
 
 class PingHandler(Handler):
-
     def handle(self, identity, message_content):
         request = PingRequest()
         request.ParseFromString(message_content)
