@@ -85,10 +85,14 @@ class BlockValidator(object):
         batches = blkw.batches
 
         if len(batch_ids) != len(batches):
+            LOGGER.warning("Length of batch ids does not match length "
+                           "of batches for block: %s", blkw)
             return False
 
         for i in range(0, len(batch_ids)):
             if batch_ids[i] != batches[i].header_signature:
+                LOGGER.warning("Batch ID does not match batch header sig "
+                               "for block: %s", blkw)
                 return False
 
         return True
@@ -100,6 +104,8 @@ class BlockValidator(object):
     def _verify_block_batches(self, blkw):
         if len(blkw.block.batches) > 0:
             prev_state = self._get_previous_block_root_state_hash(blkw)
+            LOGGER.debug("Starting state root hash for block %s is %s",
+                         blkw, prev_state)
             scheduler = self._executor.create_scheduler(
                 self._squash_handler, prev_state)
             self._executor.execute(scheduler)
@@ -119,8 +125,13 @@ class BlockValidator(object):
                 if result is not None and result.is_valid:
                     state_hash = result.state_hash
                 else:
+                    LOGGER.warning("Batch execution issue on block: %s", blkw)
                     return False
             if blkw.state_root_hash != state_hash:
+                LOGGER.warning("State root hash doesn't match what's "
+                               "on the block: %s", blkw)
+                LOGGER.debug("Block state root: %s Calculated state root: %s",
+                             blkw.state_root_hash, state_hash)
                 return False
         return True
 
@@ -129,6 +140,7 @@ class BlockValidator(object):
             if blkw.status == BlockStatus.Valid:
                 return True
             elif blkw.status == BlockStatus.Invalid:
+                LOGGER.warning("Block Status is invalid: %s", blkw)
                 return False
             else:
                 valid = True
