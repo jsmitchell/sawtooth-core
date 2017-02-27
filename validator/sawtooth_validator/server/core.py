@@ -295,7 +295,7 @@ class Validator(object):
 
     @staticmethod
     def load_identity_signing_key(key_dir, key_name):
-        """Loads a private key from the key director, based on a validator's
+        """Loads a private key from the key directory, based on a validator's
         identity.
 
         Args:
