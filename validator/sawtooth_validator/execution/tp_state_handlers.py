@@ -34,7 +34,7 @@ class TpStateGetHandler(Handler):
         return_values = self._context_manager.get(
             get_request.context_id, get_request.addresses)
         return_list = return_values if return_values is not None else []
-        LOGGER.debug("GET: %s", return_list)
+        # LOGGER.debug("GET: %s", return_list)
         entry_list = [state_context_pb2.Entry(address=a,
                                               data=d) for a, d in return_list]
         response = state_context_pb2.TpStateGetResponse()
@@ -64,7 +64,7 @@ class TpStateSetHandler(Handler):
         response = state_context_pb2.TpStateSetResponse()
         if return_value is True:
             address_list = [e.address for e in set_request.entries]
-            LOGGER.debug("SET: %s", address_list)
+            # LOGGER.debug("SET: %s", address_list)
             response.addresses.extend(address_list)
         else:
             LOGGER.debug("SET: No Values Set")
