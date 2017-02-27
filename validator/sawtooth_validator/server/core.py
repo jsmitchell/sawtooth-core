@@ -15,10 +15,8 @@
 
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import ProcessPoolExecutor
-import hashlib
 import logging
 import os
-import time
 
 from sawtooth_signing import secp256k1_signer as signing
 
@@ -98,8 +96,7 @@ class Validator(object):
                                      secured=False)
         executor = TransactionExecutor(self._service, context_manager)
 
-        identity = hashlib.sha512(
-            time.time().hex().encode()).hexdigest()[:23]
+        identity = network_endpoint
 
         identity_signing_key = Validator.load_identity_signing_key(
             key_dir,
