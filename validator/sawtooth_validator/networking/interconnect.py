@@ -102,8 +102,7 @@ class _SendReceive(object):
                 if self._socket.getsockopt(zmq.TYPE) == zmq.ROUTER:
                     self._dispatcher.dispatch(identity, message)
                 else:
-                    LOGGER.info(
-                        "received a first message on the zmq dealer.")
+                    self._dispatcher.dispatch(None, message)
             else:
                 my_future = self._futures.get(message.correlation_id)
                 if get_enum_name(message.message_type)[:2] != 'TP':
@@ -167,6 +166,7 @@ class _SendReceive(object):
 
                 self._socket.curve_serverkey = self._server_public_key
 
+            self._dispatcher.set_send_message(self.send_message)
             self._socket.connect(self._address)
         elif socket_type == zmq.ROUTER:
             self._socket = self._context.socket(socket_type)
@@ -234,6 +234,7 @@ class Interconnect(object):
             self.connections = [
                 Connection(
                     endpoint=addr,
+                    dispatcher=dispatcher,
                     identity=identity,
                     secured=secured,
                     server_public_key=server_public_key,
@@ -276,6 +277,7 @@ class Interconnect(object):
 class Connection(object):
     def __init__(self,
                  endpoint,
+                 dispatcher,
                  identity,
                  secured,
                  server_public_key,
@@ -283,12 +285,14 @@ class Connection(object):
         self._futures = future.FutureCollection()
         self._identity = identity
         self._endpoint = endpoint
+        self._dispatcher = dispatcher
         self._secured = secured
         self._server_public_key = server_public_key
         self._server_private_key = server_private_key
         self._send_receive_thread = _SendReceive(
             "ConnectionThread-{}".format(self._endpoint),
             endpoint,
+            dispatcher=self._dispatcher,
             futures=self._futures,
             identity=identity,
             secured=secured,
