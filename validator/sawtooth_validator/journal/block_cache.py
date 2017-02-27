@@ -20,7 +20,7 @@ class BlockCache(TimedCache):
     """
     A dict like interface to access blocks. Stores BlockState objects.
     """
-    def __init__(self, block_store=None, keep_time=10):
+    def __init__(self, block_store=None, keep_time=1000):
         super(BlockCache, self).__init__(keep_time)
         self._block_store = block_store if block_store is not None else {}
 
