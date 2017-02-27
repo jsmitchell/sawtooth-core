@@ -243,6 +243,9 @@ class Interconnect(object):
         else:
             self.connections = []
 
+    def _list_connections(self):
+        return [conn.endpoint for conn in self.connections]
+
     def send(self, message_type, data, identity, has_callback=False):
         """
         Send a message of message_type
@@ -300,6 +303,10 @@ class Connection(object):
             server_private_key=server_private_key)
 
         self._thread = None
+
+    @property
+    def endpoint(self):
+        return self._endpoint
 
     def send(self, message_type, data):
         """
