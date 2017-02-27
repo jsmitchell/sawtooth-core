@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ------------------------------------------------------------------------------
-import copy
 import logging
 from threading import RLock
+from collections import deque
 
 from sawtooth_signing import secp256k1_signer as signing
 
@@ -52,7 +52,7 @@ class BlockPublisher(object):
         self._state_view_factory = state_view_factory
         self._transaction_executor = transaction_executor
         self._block_sender = block_sender
-        self._pending_batches = []  # batches we are waiting for validation
+        self._pending_batches = deque()
         self._validated_batches = []  # batches that are valid and can be added
         # to the next block.
         self._scheduler = None
@@ -89,9 +89,13 @@ class BlockPublisher(object):
             self._squash_handler, chain_head.state_root_hash)
 
         self._transaction_executor.execute(self._scheduler)
-        for batch in self._pending_batches:
-            self._scheduler.add_batch(batch)
-        self._pending_batches = []
+        for _ in range(50):
+            if self._pending_batches:
+                LOGGER.debug("Sending batch to scheduler")
+                self._scheduler.add_batch(self._pending_batches.popleft())
+            else:
+                break
+
         return BlockBuilder(block_header)
 
     def _sign_block(self, block):
@@ -175,11 +179,14 @@ class BlockPublisher(object):
             self._scheduler.complete(block=True)
 
         # Read valid batches from self._scheduler
-        pending_batches = copy.copy(self._pending_batches)
-        self._pending_batches = []
+        pending_batches = self._pending_batches.copy()
+        self._pending_batches = deque()
 
         state_hash = None
-        for batch in pending_batches:
+        LOGGER.debug("Finalizing block. Pending batches: %s",
+                     len(pending_batches))
+        while pending_batches:
+            batch = pending_batches.popleft()
             result = self._scheduler.get_batch_execution_result(
                 batch.header_signature)
             # if a result is None, this means that the executor never
@@ -212,11 +219,11 @@ class BlockPublisher(object):
         try:
             with self._lock:
                 if self._candidate_block is None and\
-                        len(self._pending_batches) != 0:
+                        self._pending_batches:
                     self._candidate_block = self._build_block(self._chain_head)
 
                 if self._candidate_block and \
-                        (force or len(self._pending_batches) != 0) and \
+                        (force or self._pending_batches) and \
                         self._consensus.check_publish_block(self.
                                                             _candidate_block):
                     candidate = self._candidate_block
