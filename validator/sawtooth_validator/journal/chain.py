@@ -566,8 +566,7 @@ class ChainController(object):
 
             valid = validator.validate_block(block, committed_txn)
             if valid:
-                self._block_store.set_chain_head(block.identifier)
-                self._block_store[block.identifier] = block
+                self._block_store.update_chain([block])
                 self._chain_head = block
                 self._notify_on_chain_updated(self._chain_head)
             else:

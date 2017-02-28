@@ -188,8 +188,7 @@ class BlockPublisher(object):
             if dep not in committed_txn:
                 LOGGER.debug("Transaction rejected due " +
                              "missing dependency, transaction " +
-                             "{} depends on {}",
-                             txn.header_signature, dep)
+                             "%s depends on %s", txn.header_signature,dep)
                 return False
         return True
 
@@ -340,7 +339,7 @@ class BlockPublisher(object):
 
         if state_hash is None:
             LOGGER.debug("Abandoning block %s no batches added", block)
-            return
+            return False
 
         self._consensus.finalize_block(block)
         self._consensus = None
@@ -348,7 +347,7 @@ class BlockPublisher(object):
         block.set_state_hash(state_hash)
         self._sign_block(block)
 
-        return block
+        return True
 
     def on_check_publish_block(self, force=False):
         """Ask the consensus module if it is time to claim the candidate block
@@ -368,12 +367,13 @@ class BlockPublisher(object):
                     candidate = self._candidate_block
                     self._candidate_block = None
 
-                    self._finalize_block(candidate)
+                    if not self._finalize_block(candidate):
+                        return
+
                     # if no batches are in the block, do not send it out
                     if len(candidate.batches) == 0:
-                        LOGGER.info("No Valid batches added to block, " +
-                                    " dropping %s",
-                                    candidate.identifier[:8])
+                        LOGGER.info("No valid batches added to block, " +
+                                    " dropping %s", candidate)
                         return
 
                     block = BlockWrapper(candidate.build_block())
