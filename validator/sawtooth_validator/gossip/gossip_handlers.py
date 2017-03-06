@@ -34,7 +34,7 @@ class HelloHandler(Handler):
     def __init__(self, gossip):
         self._gossip = gossip
 
-    def handle(self, identity, message_content):
+    def handle(self, identity, connection, message_content):
         message = HelloMessage()
         message.ParseFromString(message_content)
         LOGGER.debug("got hello message from %s. sending ack",
@@ -60,7 +60,7 @@ class GoodbyeHandler(Handler):
     def __init__(self, gossip):
         self._gossip = gossip
 
-    def handle(self, identity, message_content):
+    def handle(self, identity, connection, message_content):
         message = GoodbyeMessage()
         message.ParseFromString(message_content)
         LOGGER.debug("got goodbye message from %s, sending ack",
@@ -82,7 +82,7 @@ class PeerRegisterHandler(Handler):
     def __init__(self, gossip):
         self._gossip = gossip
 
-    def handle(self, identity, message_content):
+    def handle(self, identity, connection, message_content):
         request = PeerRegisterRequest()
         request.ParseFromString(message_content)
         LOGGER.debug("got peer register message "
@@ -101,7 +101,7 @@ class PeerUnregisterHandler(Handler):
     def __init__(self, gossip):
         self._gossip = gossip
 
-    def handle(self, identity, message_content):
+    def handle(self, identity, connection, message_content):
         request = PeerUnregisterRequest()
         request.ParseFromString(message_content)
         LOGGER.debug("got peer unregister message "
@@ -117,7 +117,7 @@ class PeerUnregisterHandler(Handler):
 
 
 class GossipMessageHandler(Handler):
-    def handle(self, identity, message_content):
+    def handle(self, identity, connection, message_content):
 
         ack = NetworkAcknowledgement()
         ack.status = ack.OK
@@ -135,7 +135,7 @@ class GossipBroadcastHandler(Handler):
     def __init__(self, gossip):
         self._gossip = gossip
 
-    def handle(self, identity, message_content):
+    def handle(self, identity, connection, message_content):
         gossip_message = GossipMessage()
         gossip_message.ParseFromString(message_content)
         if gossip_message.content_type == "BATCH":

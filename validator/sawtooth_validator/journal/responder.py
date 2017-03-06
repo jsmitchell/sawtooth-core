@@ -47,7 +47,7 @@ class BlockResponderHandler(Handler):
         self._responder = responder
         self._gossip = gossip
 
-    def handle(self, identity, message_content):
+    def handle(self, identity, connection, message_content):
         gossip_message = network_pb2.GossipBlockRequest()
         gossip_message.ParseFromString(message_content)
         block_id = gossip_message.block_id
@@ -79,7 +79,7 @@ class BatchByBatchIdResponderHandler(Handler):
         self._responder = responder
         self._gossip = gossip
 
-    def handle(self, identity, message_content):
+    def handle(self, identity, connection, message_content):
         gossip_message = network_pb2.GossipBatchByBatchIdRequest()
         gossip_message.ParseFromString(message_content)
         batch = None
@@ -104,7 +104,7 @@ class BatchByTransactionIdResponderHandler(Handler):
         self._responder = responder
         self._gossip = gossip
 
-    def handle(self, identity, message_content):
+    def handle(self, identity, connection, message_content):
         gossip_message = network_pb2.GossipBatchByTransactionIdRequest()
         gossip_message.ParseFromString(message_content)
         batch = None

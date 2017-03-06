@@ -26,7 +26,7 @@ LOGGER = logging.getLogger(__name__)
 
 class PingHandler(Handler):
 
-    def handle(self, identity, message_content):
+    def handle(self, identity, connection, message_content):
         request = PingRequest()
         request.ParseFromString(message_content)
 
