@@ -13,6 +13,7 @@
 # limitations under the License.
 # ------------------------------------------------------------------------------
 import logging
+import copy
 from threading import Condition
 from functools import partial
 
@@ -73,12 +74,13 @@ class Gossip(object):
                 LOGGER.debug("Attempt to unregister identity %s failed: "
                              "identity was not registered")
 
-    def broadcast_block(self, block):
+    def broadcast_block(self, block, exclude=None):
         gossip_message = GossipMessage(
             content_type="BLOCK",
             content=block.SerializeToString())
 
-        self.broadcast(gossip_message, validator_pb2.Message.GOSSIP_MESSAGE)
+        self.broadcast(
+            gossip_message, validator_pb2.Message.GOSSIP_MESSAGE, exclude)
 
     def broadcast_block_request(self, block_id):
         # Need to define node identity to be able to route directly back
@@ -86,12 +88,13 @@ class Gossip(object):
         self.broadcast(block_request,
                        validator_pb2.Message.GOSSIP_BLOCK_REQUEST)
 
-    def broadcast_batch(self, batch):
+    def broadcast_batch(self, batch, exclude=None):
         gossip_message = GossipMessage(
             content_type="BATCH",
             content=batch.SerializeToString())
 
-        self.broadcast(gossip_message, validator_pb2.Message.GOSSIP_MESSAGE)
+        self.broadcast(
+            gossip_message, validator_pb2.Message.GOSSIP_MESSAGE, exclude)
 
     def broadcast_batch_by_transaction_id_request(self, transaction_ids):
         # Need to define node identity to be able to route directly back

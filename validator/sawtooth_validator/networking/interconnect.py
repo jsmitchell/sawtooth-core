@@ -114,6 +114,14 @@ class _SendReceive(object):
     def _received_from_identity(self, identity):
         self._connected_identities[identity] = time.time()
 
+    @property
+    def connection(self):
+        return self._connection
+
+    @property
+    def identity(self):
+        return self._identity
+
     @asyncio.coroutine
     def _receive_message(self):
         """
@@ -398,6 +406,9 @@ class OutboundConnection(object):
     @property
     def endpoint(self):
         return self._endpoint
+
+    def local_id(self):
+        return self._send_receive_thread.connection
 
     def send(self, message_type, data, callback=None):
         """
