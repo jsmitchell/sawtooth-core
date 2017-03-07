@@ -20,12 +20,62 @@ from sawtooth_validator.networking.dispatch import HandlerStatus
 from sawtooth_validator.protobuf import validator_pb2
 from sawtooth_validator.protobuf.batch_pb2 import Batch
 from sawtooth_validator.protobuf.block_pb2 import Block
+from sawtooth_validator.protobuf.network_pb2 import HelloMessage
+from sawtooth_validator.protobuf.network_pb2 import GoodbyeMessage
 from sawtooth_validator.protobuf.network_pb2 import GossipMessage
 from sawtooth_validator.protobuf.network_pb2 import PeerRegisterRequest
 from sawtooth_validator.protobuf.network_pb2 import PeerUnregisterRequest
 from sawtooth_validator.protobuf.network_pb2 import NetworkAcknowledgement
 
 LOGGER = logging.getLogger(__name__)
+
+
+class HelloHandler(Handler):
+    def __init__(self, gossip):
+        self._gossip = gossip
+
+    def handle(self, identity, message_content):
+        message = HelloMessage()
+        message.ParseFromString(message_content)
+        LOGGER.debug("got hello message from %s. sending ack",
+                     identity)
+        ack = NetworkAcknowledgement()
+
+        if self._gossip.num_connections >= self._gossip.max_connections:
+            LOGGER.debug("We're all full up on connections, sending error")
+            ack.status = ack.ERROR
+        else:
+            self._gossip.num_connections = self._gossip.num_connections + 1
+            LOGGER.debug("Adding connection. Num connections is %s",
+                         self._gossip.num_connections)
+            ack.status = ack.OK
+
+        return HandlerResult(
+            HandlerStatus.RETURN,
+            message_out=ack,
+            message_type=validator_pb2.Message.NETWORK_ACK)
+
+
+class GoodbyeHandler(Handler):
+    def __init__(self, gossip):
+        self._gossip = gossip
+
+    def handle(self, identity, message_content):
+        message = GoodbyeMessage()
+        message.ParseFromString(message_content)
+        LOGGER.debug("got goodbye message from %s, sending ack",
+                     identity)
+
+        ack = NetworkAcknowledgement()
+        ack.status = ack.OK
+        self._gossip.num_connections = self._gossip.num_connections - 1
+        LOGGER.debug("Removing connection. Num connections is %s",
+                     self._gossip.num_connections)
+
+        return HandlerResult(
+            HandlerStatus.RETURN,
+            message_out=ack,
+            message_type=validator_pb2.Message.NETWORK_ACK)
 
 
 class PeerRegisterHandler(Handler):
@@ -95,7 +145,7 @@ class GossipBroadcastHandler(Handler):
         elif gossip_message.content_type == "BLOCK":
             block = Block()
             block.ParseFromString(gossip_message.content)
-            self._gossip.broadcast_block(block)
+            self._gossip.broadcast_block(block, exclude)
         else:
             LOGGER.info("received %s, not BATCH or BLOCK",
                         gossip_message.content_type)

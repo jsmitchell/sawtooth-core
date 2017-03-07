@@ -176,12 +176,14 @@ class BlockPublisher(object):
         transaction, updated during processing.
         :return: Boolean, True if dependencies checkout, False otherwise.
         """
+        LOGGER.critical("Checking batch dependencies")
         for txn in batch.transactions:
             if not self._check_transaction_dependencies(txn,
                                                         committed_txn_cache):
                 # if any transaction in this batch fails the whole batch
                 # fails.
                 committed_txn_cache.remove_batch(batch)
+                LOGGER.critical("Failing batch")
                 return False
             # update so any subsequent txn in the same batch can be dependent
             # on this transaction.
@@ -209,6 +211,7 @@ class BlockPublisher(object):
         :param batch: the batch to validate
         :return: None
         """
+        LOGGER.critical("In _validate_batch")
         if self._scheduler:
             try:
                 self._scheduler.add_batch(batch)
@@ -221,6 +224,7 @@ class BlockPublisher(object):
         :param batch: the new pending batch
         :return: None
         """
+        LOGGER.critical("Got a new batch")
         with self._lock:
             # first we check if the transaction dependencies are satisfied
             # The completer should have taken care of making sure all

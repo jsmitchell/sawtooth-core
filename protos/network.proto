@@ -17,6 +17,15 @@ syntax = "proto3";
 option java_multiple_files = true;
 option java_package = "sawtooth.sdk.protobuf";
 
+// The hello message from a client to the server
+message HelloMessage {
+    string identity = 1;
+}
+
+// The goodbye message from a client to the server
+message GoodbyeMessage {
+    string identity = 1;
+}
 
 // The registration request from a peer to the validator
 message PeerRegisterRequest {

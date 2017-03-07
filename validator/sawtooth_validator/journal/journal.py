@@ -181,10 +181,14 @@ class Journal(object):
         return self._block_store
 
     def start(self):
+        LOGGER.critical("Publisher start")
         if self._publisher_thread is None and self._chain_thread is None:
+            LOGGER.critical("Initing subprocesses")
             self._init_subprocesses()
 
+        LOGGER.critical("Starting publisher thread")
         self._publisher_thread.start()
+        LOGGER.critical("Started publisher thread")
         self._chain_thread.start()
 
     def stop(self):
@@ -210,4 +214,5 @@ class Journal(object):
         New batch has been received, queue it with the BlockPublisher for
         inclusion in the next block.
         """
+        LOGGER.critical("Queueing batch")
         self._batch_queue.put(batch)

@@ -14,23 +14,35 @@
 # ------------------------------------------------------------------------------
 import logging
 from threading import Condition
+from functools import partial
 
+from sawtooth_validator.protobuf import validator_pb2
 from sawtooth_validator.protobuf.network_pb2 import GossipMessage
 from sawtooth_validator.protobuf.network_pb2 import GossipBatchByBatchIdRequest
 from sawtooth_validator.protobuf.network_pb2 import \
     GossipBatchByTransactionIdRequest
 from sawtooth_validator.protobuf.network_pb2 import GossipBlockRequest
-from sawtooth_validator.protobuf import validator_pb2
 from sawtooth_validator.protobuf.network_pb2 import PeerRegisterRequest
+from sawtooth_validator.protobuf.network_pb2 import HelloMessage
+from sawtooth_validator.protobuf.network_pb2 import NetworkAcknowledgement
 
 LOGGER = logging.getLogger(__name__)
 
 
+def get_message_type_name(enum_value):
+    return validator_pb2.Message.MessageType.Name(enum_value)
+
+
 class Gossip(object):
-    def __init__(self, network):
+    def __init__(self, network, initial_connections=None,
+                 max_connections=100):
         self._condition = Condition()
         self._network = network
         self._identities = []
+        self._initial_connections = initial_connections \
+                if initial_connections else []
+        self.max_connections = max_connections
+        self.num_connections = 0
 
     def register_identity(self, identity):
         """Registers a connected identity.
@@ -99,25 +111,98 @@ class Gossip(object):
             batch_request,
             validator_pb2.Message.GOSSIP_BATCH_BY_BATCH_ID_REQUEST)
 
-    def broadcast(self, gossip_message, message_type):
-        # Gossip broadcasts are sent out in two different ways.
-        # 1) To connected identities on our server socket
-        # 2) To outbound connections we have originated
-        for identity in self._identities:
+    def send(self, identity, connection, gossip_message, message_type):
+        LOGGER.debug("Trying direct send to identity %s connection %s",
+                     identity,
+                     connection)
+
+        if connection == "ServerThread":
             self._network.send(message_type,
                                gossip_message.SerializeToString(),
                                identity)
-        for connection in self._network.connections:
-            connection.send(message_type, gossip_message.SerializeToString())
+        else:
+            self._network.outbound_connections[connection].send(message_type,
+                            gossip_message.SerializeToString())
 
-    def broadcast_peer_request(self, message_type, message):
-        for connection in self._network.connections:
-            connection.send(message_type, message.SerializeToString())
+    def broadcast(self, gossip_message, message_type, exclude=None):
+        """Broadcast gossip messages.
+
+        Broadcast to both connected identities on our server socket and to
+        outboud connections we have originated. If a peer's identifiers are in
+        exclude, do not broadcast message to them.
+
+        Args:
+            gossip_message: The message to be broadcast.
+            message_type: Type of the message.
+            exclude: A list of tuples that contains a peer's information
+                (connection, identifier)
+        """
+        if exclude is None:
+            exclude = []
+
+        excluded_inbound_peers = [peer[1] for peer in exclude]
+        excluded_outbound_peers = [peer[0].split('-')[1] for peer in exclude if peer[0] != "ServerThread"]
+        LOGGER.critical("Excluding outbound %s", excluded_outbound_peers)
+
+        for identity in self._identities:
+            if identity not in excluded_inbound_peers:
+                self._network.send(message_type,
+                                   gossip_message.SerializeToString(),
+                                   identity)
+
+        LOGGER.critical("Outbound Connections: %s", self._network.outbound_connections.items())
+        for conn_id, connection in self._network.outbound_connections.items():
+            if conn_id not in excluded_outbound_peers:
+                connection.send(message_type,
+                                gossip_message.SerializeToString())
+
+    def _hello_callback(self, request, result, network=None, connection=None):
+        ack = NetworkAcknowledgement()
+        ack.ParseFromString(result.content)
+
+        if ack.status == ack.ERROR:
+            LOGGER.debug("Got an error response to our hello")
+            if network:
+                if connection:
+                    # Maybe a status update instead?
+                    network.remove_connection(connection)
+                else:
+                    LOGGER.debug("Unknown connection")
+            else:
+                LOGGER.debug("Unknown network")
+        elif ack.status == ack.OK:
+            LOGGER.debug("Hello ack'd. Connecting")
+            register_request = PeerRegisterRequest()
+            connection.send(validator_pb2.Message.GOSSIP_REGISTER,
+                            register_request.SerializeToString(),
+                            callback=partial(self._register_callback,
+                                             network=self._network,
+                                             connection=connection))
+
+    def _register_callback(self, request, result,
+                           network=None, connection=None):
+        ack = NetworkAcknowledgement()
+        ack.ParseFromString(result.content)
+
+        if ack.status == ack.ERROR:
+            LOGGER.debug("Got an error response to our register")
+        elif ack.status == ack.OK:
+            LOGGER.debug("Registration ack'd. Peered")
+            LOGGER.debug("Requesting current head block")
+            self.broadcast_block_request("HEAD")
 
     def start(self):
-        for connection in self._network.connections:
-            connection.start(daemon=True)
-        register_request = PeerRegisterRequest()
-        self.broadcast_peer_request(
-            validator_pb2.Message.GOSSIP_REGISTER,
-            register_request)
+        try:
+            LOGGER.debug("Starting gossip with %s initial connections",
+                         len(self._initial_connections))
+            hello_message = HelloMessage()
+
+            for uri in self._initial_connections:
+                connection = self._network.add_connection(uri)
+                connection.send(validator_pb2.Message.GOSSIP_HELLO,
+                                hello_message.SerializeToString(),
+                                callback=partial(self._hello_callback,
+                                                 network=self._network,
+                                                 connection=connection))
+        except Exception as e:
+            LOGGER.exception(e)

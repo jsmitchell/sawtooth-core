@@ -51,6 +51,7 @@ class BlockResponderHandler(Handler):
         gossip_message = network_pb2.GossipBlockRequest()
         gossip_message.ParseFromString(message_content)
         block_id = gossip_message.block_id
+        LOGGER.critical("Checking for block %s", block_id)
         block = self._responder.check_for_block(block_id)
         if block is None:
             # No block found, broadcast orignal message to other peers
@@ -62,7 +63,12 @@ class BlockResponderHandler(Handler):
             # will be used.
             LOGGER.debug("Responding to block requests: %s",
                          block.get_block().header_signature)
-            self._gossip.broadcast_block(block.get_block())
+            #self._gossip.broadcast_block(block.get_block())
+            message = network_pb2.GossipMessage(
+                        content_type="BLOCK",
+                        content=block.get_block().SerializeToString())
+            self._gossip.send(identity, connection, message,
+                              validator_pb2.Message.GOSSIP_MESSAGE)
 
         return HandlerResult(
             status=HandlerStatus.PASS)

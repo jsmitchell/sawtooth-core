@@ -30,6 +30,7 @@ import zmq.asyncio
 from sawtooth_validator.exceptions import LocalConfigurationError
 from sawtooth_validator.protobuf import validator_pb2
 from sawtooth_validator.networking import future
+from sawtooth_validator.protobuf.network_pb2 import GoodbyeMessage
 from sawtooth_validator.protobuf.network_pb2 import PingRequest
 
 
@@ -228,6 +229,7 @@ class _SendReceive(object):
 
             self._dispatcher.add_send_message(self._connection,
                                               self.send_message)
+            LOGGER.debug("Attempting to bind to %s", self._address)
             self._socket.bind(self._address)
 
         self._recv_queue = asyncio.Queue()
@@ -254,7 +256,6 @@ class Interconnect(object):
                  endpoint,
                  dispatcher,
                  identity=None,
-                 peer_connections=None,
                  secured=False,
                  server_public_key=None,
                  server_private_key=None,
@@ -264,7 +265,7 @@ class Interconnect(object):
 
         Args:
             secured (bool): Whether or not to start the 'server' socket
-                and associated Connection sockets in secure mode --
+                and associated OutboundConnection sockets in secure mode --
                 using zmq auth.
             server_public_key (bytes): A public key to use in verifying
                 server identity as part of the zmq auth handshake.
@@ -280,6 +281,7 @@ class Interconnect(object):
         self._server_public_key = server_public_key
         self._server_private_key = server_private_key
         self._heartbeat = heartbeat
+        self.outbound_connections = {}
 
         self._send_receive_thread = _SendReceive(
             "ServerThread",
@@ -293,19 +295,40 @@ class Interconnect(object):
 
         self._thread = None
 
-        if peer_connections is not None:
-            self.connections = [
-                Connection(
-                    endpoint=addr,
-                    dispatcher=dispatcher,
-                    identity=identity,
-                    secured=secured,
-                    server_public_key=server_public_key,
-                    server_private_key=server_private_key,
-                    heartbeat=heartbeat)
-                for addr in peer_connections]
+    def add_connection(self, uri):
+        """Adds an outbound connection to the network.
+
+        Args:
+            connection (OutboundConnection): The connection to add.
+        """
+        LOGGER.debug("Adding connection to %s", uri)
+        conn = OutboundConnection(
+            endpoint=uri,
+            dispatcher=self._dispatcher,
+            identity=self._identity,
+            secured=self._secured,
+            server_public_key=self._server_public_key,
+            server_private_key=self._server_private_key,
+            heartbeat=False)
+
+        self.outbound_connections[uri] = conn
+        conn.start(daemon=True)
+        return conn
+
+    def remove_connection(self, connection):
+        """Closes and removes a connection.
+
+        Args:
+            connection (OutboundConnection): The connection to remove
+        """
+        if connection.endpoint in self.outbound_connections:
+            LOGGER.debug("Removing connection: %s",
+                         connection.endpoint)
+            connection.stop()
+            del self.outbound_connections[connection.endpoint]
         else:
-            self.connections = []
+            LOGGER.debug("Attempt to remove an unknown connection: %s",
+                         connection.endpoint)
 
     def send(self, message_type, data, identity, has_callback=False):
         """
@@ -335,10 +358,13 @@ class Interconnect(object):
         self._thread.start()
 
     def stop(self):
+        LOGGER.debug("stopping connections %s", self.outbound_connections)
+        for _, connection in self.outbound_connections.items():
+            connection.stop()
         self._thread.join()
 
 
-class Connection(object):
+class OutboundConnection(object):
     def __init__(self,
                  endpoint,
                  dispatcher,
@@ -357,7 +383,7 @@ class Connection(object):
         self._heartbeat = heartbeat
 
         self._send_receive_thread = _SendReceive(
-            "ConnectionThread-{}".format(self._endpoint),
+            "OutboundConnectionThread-{}".format(self._endpoint),
             endpoint,
             dispatcher=self._dispatcher,
             futures=self._futures,
@@ -369,23 +395,39 @@ class Connection(object):
 
         self._thread = None
 
-    def send(self, message_type, data):
+    @property
+    def endpoint(self):
+        return self._endpoint
+
+    def send(self, message_type, data, callback=None):
         """
         Send a message of message_type
         :param message_type: validator_pb2.Message.* enum value
         :param data: bytes serialized protobuf
         :return: future.Future
         """
+        LOGGER.debug("Sending message of type %s to %s",
+                     get_enum_name(message_type), self._endpoint)
         message = validator_pb2.Message(
             correlation_id=_generate_id(),
             content=data,
             message_type=message_type)
 
-        fut = future.Future(message.correlation_id, message.content)
+        fut = future.Future(message.correlation_id, message.content,
+                            has_callback=True if callback is not None
+                            else False)
+
+        if callback is not None:
+            fut.add_callback(callback)
         self._futures.put(fut)
 
         self._send_receive_thread.send_message(message)
         return fut
+
+    def send_disconnect_message(self):
+        goodbye_message = GoodbyeMessage()
+        self.send(validator_pb2.Message.GOSSIP_GOODBYE,
+                  goodbye_message.SerializeToString())
 
     def start(self, daemon=False):
         self._thread = Thread(target=self._send_receive_thread.setup,
@@ -395,4 +437,7 @@ class Connection(object):
         self._thread.start()
 
     def stop(self):
+        LOGGER.debug("Stopping connection with endpoint: %s",
+                     self._endpoint)
+        self.send_disconnect_message()
         self._thread.join()

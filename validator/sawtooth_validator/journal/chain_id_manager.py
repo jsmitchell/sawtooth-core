@@ -39,6 +39,7 @@ class ChainIdManager(object):
                 "Unable to write to {}".format(block_chain_id_file))
 
     def get_block_chain_id(self):
+        LOGGER.critical("In get_block_chain_id")
         block_chain_id_file = os.path.join(self._data_dir, 'block-chain-id')
         if not Path(block_chain_id_file).is_file():
             return None
@@ -46,6 +47,8 @@ class ChainIdManager(object):
         try:
             with open(block_chain_id_file, 'r') as f:
                 block_chain_id = f.read()
+                LOGGER.critical("Read block chain id from file: %s",
+                                block_chain_id)
                 return block_chain_id if block_chain_id else None
 
         except IOError:

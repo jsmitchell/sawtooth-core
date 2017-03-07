@@ -15,10 +15,8 @@
 
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import ProcessPoolExecutor
-import hashlib
 import logging
 import os
-import time
 
 from sawtooth_signing import secp256k1_signer as signing
 
@@ -52,6 +50,8 @@ from sawtooth_validator.networking.interconnect import Interconnect
 from sawtooth_validator.gossip.gossip import Gossip
 from sawtooth_validator.gossip.gossip_handlers import GossipBroadcastHandler
 from sawtooth_validator.gossip.gossip_handlers import GossipMessageHandler
+from sawtooth_validator.gossip.gossip_handlers import HelloHandler
+from sawtooth_validator.gossip.gossip_handlers import GoodbyeHandler
 from sawtooth_validator.gossip.gossip_handlers import PeerRegisterHandler
 from sawtooth_validator.gossip.gossip_handlers import PeerUnregisterHandler
 from sawtooth_validator.networking.handlers import PingHandler
@@ -107,8 +107,7 @@ class Validator(object):
                                        config_view_factory=ConfigViewFactory(
                                            StateViewFactory(merkle_db)))
 
-        identity = hashlib.sha512(
-            time.time().hex().encode()).hexdigest()[:23]
+        identity = network_endpoint
 
         identity_signing_key = Validator.load_identity_signing_key(
             key_dir,
@@ -130,13 +129,14 @@ class Validator(object):
             network_endpoint,
             dispatcher=self._network_dispatcher,
             identity=identity,
-            peer_connections=peer_list,
             secured=True,
             server_public_key=b'wFMwoOt>yFqI/ek.G[tfMMILHWw#vXB[Sv}>l>i)',
             server_private_key=b'r&oJ5aQDj4+V]p2:Lz70Eu0x#m%IwzBdP(}&hWM*',
             heartbeat=True)
 
-        self._gossip = Gossip(self._network)
+        self._gossip = Gossip(self._network,
+                              initial_connections=peer_list,
+                              max_connections=100)
 
         completer = Completer(block_store, self._gossip)
 
@@ -190,8 +190,7 @@ class Validator(object):
         self._dispatcher.add_handler(
             validator_pb2.Message.TP_UNREGISTER_REQUEST,
             processor_handlers.ProcessorUnRegisterHandler(executor.processors),
-            thread_pool
-        )
+            thread_pool)
 
         # Set up base network handlers
         self._network_dispatcher.add_handler(
@@ -200,6 +199,16 @@ class Validator(object):
             network_thread_pool)
 
         # Set up gossip handlers
+        self._network_dispatcher.add_handler(
+            validator_pb2.Message.GOSSIP_HELLO,
+            HelloHandler(gossip=self._gossip),
+            network_thread_pool)
+
+        self._network_dispatcher.add_handler(
+            validator_pb2.Message.GOSSIP_GOODBYE,
+            GoodbyeHandler(gossip=self._gossip),
+            network_thread_pool)
+
         self._network_dispatcher.add_handler(
             validator_pb2.Message.GOSSIP_REGISTER,
             PeerRegisterHandler(gossip=self._gossip),
