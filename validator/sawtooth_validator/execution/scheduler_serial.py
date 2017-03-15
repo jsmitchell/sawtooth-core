@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ------------------------------------------------------------------------------
-
+import logging
 import queue
 from threading import Condition
 
@@ -21,6 +21,8 @@ from sawtooth_validator.execution.scheduler import TxnInformation
 from sawtooth_validator.execution.scheduler import Scheduler
 from sawtooth_validator.execution.scheduler import SchedulerIterator
 from sawtooth_validator.execution.scheduler_exceptions import SchedulerError
+
+LOGGER = logging.getLogger(__name__)
 
 
 class SerialScheduler(Scheduler):
@@ -103,6 +105,7 @@ class SerialScheduler(Scheduler):
                     self._last_in_batch.append(txn.header_signature)
                 self._txn_to_batch[txn.header_signature] = batch_signature
                 self._txn_queue.put(txn)
+                self._condition.notify_all()
 
     def get_batch_execution_result(self, batch_signature):
         with self._condition:

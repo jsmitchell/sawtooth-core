@@ -134,6 +134,7 @@ class _SendReceive(object):
         ping = PingRequest()
 
         while True:
+            LOGGER.debug("Starting heartbeat loop")
             if self._socket.getsockopt(zmq.TYPE) == zmq.ROUTER:
                 expired = [ident for ident in self._last_message_times
                            if time.time() - self._last_message_times[ident] >
@@ -155,6 +156,7 @@ class _SendReceive(object):
                                             message.content,
                                             has_callback=False)
                         self._futures.put(fut)
+                        LOGGER.debug("Prior to yield on send ping")
                         yield from self._send_message(zmq_identity, message)
             elif self._socket.getsockopt(zmq.TYPE) == zmq.DEALER:
                 if self._last_message_time:
@@ -164,6 +166,7 @@ class _SendReceive(object):
                                      self._connection,
                                      self._connection_timeout)
                         self.stop()
+            LOGGER.debug("Prior to yield on heartbeat sleep")
             yield from asyncio.sleep(self._heartbeat_interval)
 
     def _remove_connected_identity(self, zmq_identity):

@@ -47,7 +47,7 @@ from sawtooth_validator.journal.consensus.poet.poet_enclave_simulator\
 
 LOGGER = logging.getLogger(__name__)
 
-TIMER_TIMEOUT_PERIOD = 3.0
+TIMER_TIMEOUT_PERIOD = 300.0
 
 
 class _PoetEnclaveSimulator(object):

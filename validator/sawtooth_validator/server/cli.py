@@ -33,6 +33,9 @@ def parse_args(args):
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawTextHelpFormatter)
 
+    parser.add_argument('--name',
+                        help='Validator name (temp for keys)',
+                        type=str)
     parser.add_argument('--config-dir',
                         help='Configuration directory',
                         type=str)
@@ -124,7 +127,7 @@ def main(args=sys.argv[1:]):
     try:
         identity_signing_key = load_identity_signing_key(
             key_dir=path_config.key_dir,
-            key_name='validator')
+            key_name=opts.name if opts.name else 'validator')
     except LocalConfigurationError as e:
         LOGGER.error(str(e))
         init_errors = True

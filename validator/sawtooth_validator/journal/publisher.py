@@ -200,9 +200,9 @@ class BlockPublisher(object):
         txn_hdr.ParseFromString(txn.header)
         for dep in txn_hdr.dependencies:
             if dep not in committed_txn:
-                LOGGER.debug("Transaction rejected due " +
-                             "missing dependency, transaction " +
-                             "%s depends on %s", txn.header_signature, dep)
+                #LOGGER.debug("Transaction rejected due " +
+                #             "missing dependency, transaction " +
+                #             "%s depends on %s", txn.header_signature, dep)
                 return False
         return True
 
@@ -255,8 +255,9 @@ class BlockPublisher(object):
                 if self._chain_head is not None:
                     self._validate_batch(batch)
             else:
-                LOGGER.debug("Dropping batch due to missing dependencies: %s",
-                             batch.header_signature)
+                #LOGGER.debug("Dropping batch due to missing dependencies: %s",
+                #             batch.header_signature)
+                pass
 
     def _rebuild_pending_batches(self, committed_batches, uncommitted_batches):
         """When the chain head is changed. This recomputes the list of pending
@@ -338,7 +339,7 @@ class BlockPublisher(object):
     def _finalize_block(self, block):
         if self._scheduler:
             self._scheduler.finalize()
-            self._scheduler.complete(block=True)
+            self._scheduler.complete(block=False)
 
         # Read valid batches from self._scheduler
         pending_batches = self._pending_batches
