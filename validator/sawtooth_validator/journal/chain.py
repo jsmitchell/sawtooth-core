@@ -185,6 +185,7 @@ class BlockValidator(object):
             if blkw.status == BlockStatus.Valid:
                 return True
             elif blkw.status == BlockStatus.Invalid:
+                LOGGER.info("Block wrapper status invalid. Declaring block invalid")
                 return False
             else:
                 valid = True
@@ -196,15 +197,23 @@ class BlockValidator(object):
 
                 if valid:
                     valid = self._is_block_complete(blkw)
+                    if not valid:
+                        LOGGER.info("Block failed completion check")
 
                 if valid:
                     valid = self._verify_block_signature(blkw)
+                    if not valid:
+                        LOGGER.info("Block failed signature check")
 
                 if valid:
                     valid = self._verify_block_batches(blkw, committed_txn)
+                    if not valid:
+                        LOGGER.info("Block failed batch verification")
 
                 if valid:
                     valid = consensus.verify_block(blkw)
+                    if not valid:
+                        LOGGER.info("Block failed consensus check")
 
                 blkw.status = BlockStatus.Valid if \
                     valid else BlockStatus.Invalid

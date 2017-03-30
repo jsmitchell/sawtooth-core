@@ -92,11 +92,11 @@ class GossipBroadcastHandler(Handler):
         if gossip_message.content_type == "BATCH":
             batch = Batch()
             batch.ParseFromString(gossip_message.content)
-            self._gossip.broadcast_batch(batch, exclude)
+            #self._gossip.broadcast_batch(batch, exclude)
         elif gossip_message.content_type == "BLOCK":
             block = Block()
             block.ParseFromString(gossip_message.content)
-            self._gossip.broadcast_block(block, exclude)
+            #self._gossip.broadcast_block(block, exclude)
         else:
             LOGGER.info("received %s, not BATCH or BLOCK",
                         gossip_message.content_type)

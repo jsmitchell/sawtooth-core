@@ -29,6 +29,8 @@ services:
         ./bin/sawtooth config proposal create \
           -k /etc/sawtooth/keys/validator.wif \
           sawtooth.consensus.algorithm=poet \
+          sawtooth.poet.target_wait_time=5 \
+          sawtooth.poet.initial_wait_time=0 \
           -o config.batch && \
         ./bin/poet genesis -o poet.batch && \
         ./bin/sawtooth admin genesis config.batch poet.batch && \
